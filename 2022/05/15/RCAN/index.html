@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 6.2.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.1.1/css/all.min.css" integrity="sha256-DfWjNxDkM94fVBWx1H5BMMp0Zq7luBlV8QRcSES7s+0=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"bugducky.github.io","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.11.1","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12},"copycode":false,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"Searching...","empty":"We didn't find any results for the search: ${query}","hits_time":"${hits} results found in ${time} ms","hits":"${hits} results found"}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="概述 作者在摘要中提出CNN的深度对图像超分辨率很重要，但是更深的SR模型很难训练。低分辨率输入和特征包含丰富的低频信号，这些信息在CNN网络中的重要性是相同的，阻碍了CNN的表征能力。 为解决上述问题，作者提出带有*Residual in Residual(RIR)*块的RCAN网络。RIR使得丰富的低频信息多次跳跃向后连接，让主网络专注于学习高频信息。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="浅读RCAN">
+<meta property="og:url" content="https://bugducky.github.io/2022/05/15/RCAN/index.html">
+<meta property="og:site_name" content="Bugducky&#39;s Blog">
+<meta property="og:description" content="概述 作者在摘要中提出CNN的深度对图像超分辨率很重要，但是更深的SR模型很难训练。低分辨率输入和特征包含丰富的低频信号，这些信息在CNN网络中的重要性是相同的，阻碍了CNN的表征能力。 为解决上述问题，作者提出带有*Residual in Residual(RIR)*块的RCAN网络。RIR使得丰富的低频信息多次跳跃向后连接，让主网络专注于学习高频信息。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://bugducky.github.io/2022/05/15/RCAN/image-20220515121129433.png">
+<meta property="og:image" content="https://bugducky.github.io/2022/05/15/RCAN/image-20220515151841824.png">
+<meta property="og:image" content="https://bugducky.github.io/2022/05/15/RCAN/image-20220515165633775.png">
+<meta property="og:image" content="https://bugducky.github.io/2022/05/15/RCAN/image-20220515122207619.png">
+<meta property="og:image" content="https://bugducky.github.io/2022/05/15/RCAN/5600.png">
+<meta property="article:published_time" content="2022-05-15T11:49:45.000Z">
+<meta property="article:modified_time" content="2022-05-16T13:22:24.084Z">
+<meta property="article:author" content="Bugducky">
+<meta property="article:tag" content="deeplearning">
+<meta property="article:tag" content="super-resolutio">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://bugducky.github.io/2022/05/15/RCAN/image-20220515121129433.png">
+
+
+<link rel="canonical" href="https://bugducky.github.io/2022/05/15/RCAN/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"en","comments":true,"permalink":"https://bugducky.github.io/2022/05/15/RCAN/","path":"2022/05/15/RCAN/","title":"浅读RCAN"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>浅读RCAN | Bugducky's Blog</title>
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar" role="button">
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Bugducky's Blog</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">想睡觉的菜鸡</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+
+
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A6%82%E8%BF%B0"><span class="nav-number">1.</span> <span class="nav-text">概述</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#RCAN%E6%A8%A1%E5%9E%8B"><span class="nav-number">2.</span> <span class="nav-text">RCAN模型</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Channel-attention%EF%BC%88CA%EF%BC%89"><span class="nav-number">2.0.1.</span> <span class="nav-text">Channel attention（CA）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Residual-Channel-Attention-Block%EF%BC%88RCAB%EF%BC%89"><span class="nav-number">2.0.2.</span> <span class="nav-text">Residual Channel Attention Block（RCAB）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Residual-in-residual%EF%BC%88RIR%EF%BC%89"><span class="nav-number">2.0.3.</span> <span class="nav-text">Residual in residual（RIR）</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9E%E9%AA%8C"><span class="nav-number">3.</span> <span class="nav-text">实验</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Bugducky</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">3</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+        <span class="site-state-item-count">3</span>
+        <span class="site-state-item-name">tags</span>
+      </div>
+  </nav>
+</div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="Back to top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://bugducky.github.io/2022/05/15/RCAN/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Bugducky">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Bugducky's Blog">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="浅读RCAN | Bugducky's Blog">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          浅读RCAN
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">Posted on</span>
+
+      <time title="Created: 2022-05-15 19:49:45" itemprop="dateCreated datePublished" datetime="2022-05-15T19:49:45+08:00">2022-05-15</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">Edited on</span>
+      <time title="Modified: 2022-05-16 21:22:24" itemprop="dateModified" datetime="2022-05-16T21:22:24+08:00">2022-05-16</time>
+    </span>
+
+  
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p><img src="/2022/05/15/RCAN/image-20220515121129433.png" alt="超分效果"></p>
+<p>作者在摘要中提出CNN的深度对图像超分辨率很重要，但是更深的SR模型很难训练。低分辨率输入和特征包含丰富的低频信号，这些信息在CNN网络中的重要性是相同的，阻碍了CNN的表征能力。</p>
+<p>为解决上述问题，作者提出带有*Residual in Residual(RIR)*块的RCAN网络。RIR使得丰富的低频信息多次跳跃向后连接，让主网络专注于学习高频信息。</p>
+<span id="more"></span>
+
+<p>此外，作者提出了通道注意力机制(Channel attention mechanism)动态调整通道特征，平等的通道对不同类型的信息会丧失灵活性，作者应该是想将低频信息和高频信息分离，高频信息更有益于HR图像重建。LR图像包含大部分低频信息，可以直接转发到最终的HR输出，不需要太多的计算(这是EDSR的问题)。作者还指出简单的堆残差块已经很难得到提升，而SRGAN等生成类模型可能缺乏真实性（SRGAN在论文中不是比较的对象），像 <em>unpleasing artifacts</em>。</p>
+<p><code>低频信息：图像中灰度值变化缓慢，即梯度较小的区域</code><br><code>高频信息：图像中灰度值变化剧烈，即梯度较大的区域</code></p>
+<p><em>EDSR</em> <a target="_blank" rel="noopener" href="https://openaccess.thecvf.com/content_cvpr_2017_workshops/w12/papers/Lim_Enhanced_Deep_Residual_CVPR_2017_paper.pdf">Enhanced Deep Residual Networks for Single Image Super-Resolution</a></p>
+<p>关于高低频信息，可以参考 <a target="_blank" rel="noopener" href="https://arxiv.org/abs/1905.13545">High-frequency Component Helps Explain the Generalization of Convolutional Neural Networks</a></p>
+<p>Zhang, Yulun, Kunpeng Li, Kai Li, Lichen Wang, Bineng Zhong和Yun Fu. 《Image Super-Resolution Using Very Deep Residual Channel Attention Networks》. 收入 <em>Computer Vision – ECCV 2018</em>, 编辑 Vittorio Ferrari, Martial Hebert, Cristian Sminchisescu和Yair Weiss, 11211:294–310. Lecture Notes in Computer Science. Cham: Springer International Publishing, 2018. <a target="_blank" rel="noopener" href="https://doi.org/10.1007/978-3-030-01234-2_18">https://doi.org/10.1007/978-3-030-01234-2_18</a>.</p>
+<h2 id="RCAN模型"><a href="#RCAN模型" class="headerlink" title="RCAN模型"></a>RCAN模型</h2><p>RCAN模型和算法相比于GAN这类模型要简单很多，作者也开源了代码，这里小弟就不班门弄斧，浅讲一下各个模块和相应的实现吧。</p>
+<p>refer:</p>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://github.com/XPixelGroup/BasicSR">https://github.com/XPixelGroup/BasicSR</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/yulunzhang/RCAN">https://github.com/yulunzhang/RCAN</a></li>
+</ul>
+<h4 id="Channel-attention（CA）"><a href="#Channel-attention（CA）" class="headerlink" title="Channel attention（CA）"></a>Channel attention（CA）</h4><p>**通道注意力Channel attention(CA)**是论文最重要的贡献之一，其使用全局平均池（global average pooling, GAP）化得到每个通道的信息，再使用卷积层对通道进行缩小和放大（论文中这个比例 r &#x3D; 16），最后进行元素乘法得到CA层的结果。</p>
+<p><img src="/2022/05/15/RCAN/image-20220515151841824.png" alt="image-20220515151841824"></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">ChannelAttention</span>(nn.Module):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;Channel attention used in RCAN.</span></span><br><span class="line"><span class="string">    Args:</span></span><br><span class="line"><span class="string">        num_feat (int): Channel number of intermediate features.</span></span><br><span class="line"><span class="string">        squeeze_factor (int): Channel squeeze factor. Default: 16.</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self, num_feat, squeeze_factor=<span class="number">16</span></span>):</span><br><span class="line">        <span class="built_in">super</span>(ChannelAttention, self).__init__()</span><br><span class="line">        self.attention = nn.Sequential(</span><br><span class="line">            nn.AdaptiveAvgPool2d(<span class="number">1</span>),</span><br><span class="line">            nn.Conv2d(num_feat, num_feat // squeeze_factor, <span class="number">1</span>, padding=<span class="number">0</span>),</span><br><span class="line">            nn.ReLU(),</span><br><span class="line">            nn.Conv2d(num_feat // squeeze_factor, num_feat, <span class="number">1</span>, padding=<span class="number">0</span>),</span><br><span class="line">            nn.Sigmoid(),</span><br><span class="line">        )</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">forward</span>(<span class="params">self, x</span>):</span><br><span class="line">        y = self.attention(x)</span><br><span class="line">        <span class="keyword">return</span> x * y</span><br></pre></td></tr></table></figure>
+
+<h4 id="Residual-Channel-Attention-Block（RCAB）"><a href="#Residual-Channel-Attention-Block（RCAB）" class="headerlink" title="Residual Channel Attention Block（RCAB）"></a>Residual Channel Attention Block（RCAB）</h4><p>这里主要讲一下这里跳跃式连接的思想。作者想通过跳跃连接的方式将低频信息直接交给后面模块，中间的CA模块直接处理新的卷积层抽取的特征，以达到较少计算量、提升性能的作用。</p>
+<p><img src="/2022/05/15/RCAN/image-20220515165633775.png" alt="image-20220515165633775"></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">RCAB</span>(nn.Module):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;Residual Channel Attention Block (RCAB) used in RCAN.</span></span><br><span class="line"><span class="string">    Args:</span></span><br><span class="line"><span class="string">        num_feat (int): Channel number of intermediate features.</span></span><br><span class="line"><span class="string">        squeeze_factor (int): Channel squeeze factor. Default: 16.</span></span><br><span class="line"><span class="string">        res_scale (float): Scale the residual. Default: 1.</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self, num_feat, squeeze_factor=<span class="number">16</span>, res_scale=<span class="number">1</span></span>):</span><br><span class="line">        <span class="built_in">super</span>(RCAB, self).__init__()</span><br><span class="line">        self.res_scale = res_scale</span><br><span class="line"></span><br><span class="line">        self.rcab = nn.Sequential(</span><br><span class="line">            nn.Conv2d(num_feat, num_feat, <span class="number">3</span>, <span class="number">1</span>, <span class="number">1</span>),</span><br><span class="line">            nn.ReLU(<span class="literal">True</span>),</span><br><span class="line">            nn.Conv2d(num_feat, num_feat, <span class="number">3</span>, <span class="number">1</span>, <span class="number">1</span>),</span><br><span class="line">            ChannelAttention(num_feat, squeeze_factor),</span><br><span class="line">        )</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">forward</span>(<span class="params">self, x</span>):</span><br><span class="line">        res = self.rcab(x) * self.res_scale</span><br><span class="line">        <span class="keyword">return</span> res + x</span><br></pre></td></tr></table></figure>
+
+
+
+<h4 id="Residual-in-residual（RIR）"><a href="#Residual-in-residual（RIR）" class="headerlink" title="Residual in residual（RIR）"></a>Residual in residual（RIR）</h4><p>CA套娃成了RCAB，RCAB套娃就是一组ResidualGroup（RG），RG套娃成了RCAN模型。难道说深度学习算法的本质就是套娃吗？</p>
+<p>上采样模块使用 Pixelshuffle，它是ESPCN中提出的 <em>sub-pixel convolution</em> 在 PyTorch 上的实现，通过降低通道数来提升分辨率。某人想知道的实时视频超分的模型就是这个ESPCN。</p>
+<p>ESPCN: <a target="_blank" rel="noopener" href="http://www.cv-foundation.org/openaccess/content_cvpr_2016/papers/Shi_Real-Time_Single_Image_CVPR_2016_paper.pdf">http://www.cv-foundation.org/openaccess/content_cvpr_2016/papers/Shi_Real-Time_Single_Image_CVPR_2016_paper.pdf</a></p>
+<p><img src="/2022/05/15/RCAN/image-20220515122207619.png" alt="image-20220515122207619"></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">ResidualGroup</span>(nn.Module):</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self, num_feat, num_block, squeeze_factor=<span class="number">16</span>, res_scale=<span class="number">1</span></span>):</span><br><span class="line">        <span class="built_in">super</span>(ResidualGroup, self).__init__()</span><br><span class="line">        self.residual_group = make_layer(</span><br><span class="line">            RCAB, num_block, num_feat=num_feat, squeeze_factor=squeeze_factor, res_scale=res_scale</span><br><span class="line">        )</span><br><span class="line">        self.conv = nn.Conv2d(num_feat, num_feat, <span class="number">3</span>, <span class="number">1</span>, <span class="number">1</span>)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">forward</span>(<span class="params">self, x</span>):</span><br><span class="line">        res = self.conv(self.residual_group(x))</span><br><span class="line">        <span class="keyword">return</span> res + x</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">RCAN</span>(nn.Module):</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params"></span></span><br><span class="line"><span class="params">        self,num_in_ch,num_out_ch,num_feat=<span class="number">64</span>,num_group=<span class="number">10</span>,num_block=<span class="number">16</span>,</span></span><br><span class="line"><span class="params">        squeeze_factor=<span class="number">16</span>,upscale=<span class="number">4</span>,res_scale=<span class="number">1</span>,</span></span><br><span class="line"><span class="params">        img_range=<span class="number">255.0</span>,rgb_mean=(<span class="params"><span class="number">0.4488</span>, <span class="number">0.4371</span>, <span class="number">0.4040</span></span>),</span></span><br><span class="line"><span class="params">    </span>):</span><br><span class="line">        <span class="built_in">super</span>(RCAN, self).__init__()</span><br><span class="line">        self.img_range = img_range</span><br><span class="line">        self.mean = torch.Tensor(rgb_mean).view(<span class="number">1</span>, <span class="number">3</span>, <span class="number">1</span>, <span class="number">1</span>)</span><br><span class="line"></span><br><span class="line">        self.conv_first = nn.Conv2d(num_in_ch, num_feat, <span class="number">3</span>, <span class="number">1</span>, <span class="number">1</span>)</span><br><span class="line">        self.body = make_layer(</span><br><span class="line">            ResidualGroup,</span><br><span class="line">            num_group,</span><br><span class="line">            num_feat=num_feat,</span><br><span class="line">            num_block=num_block,</span><br><span class="line">            squeeze_factor=squeeze_factor,</span><br><span class="line">            res_scale=res_scale,</span><br><span class="line">        )</span><br><span class="line">        self.conv_after_body = nn.Conv2d(num_feat, num_feat, <span class="number">3</span>, <span class="number">1</span>, <span class="number">1</span>)</span><br><span class="line">        self.upsample = Upsample(upscale, num_feat)</span><br><span class="line">        self.conv_last = nn.Conv2d(num_feat, num_out_ch, <span class="number">3</span>, <span class="number">1</span>, <span class="number">1</span>)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">forward</span>(<span class="params">self, x</span>):</span><br><span class="line">        self.mean = self.mean.type_as(x)</span><br><span class="line">        x = (x - self.mean) * self.img_range</span><br><span class="line">        x = self.conv_first(x)</span><br><span class="line">        res = self.conv_after_body(self.body(x))</span><br><span class="line">        res += x</span><br><span class="line">        x = self.conv_last(self.upsample(res))</span><br><span class="line">        x = x / self.img_range + self.mean</span><br><span class="line">        <span class="keyword">return</span> x</span><br></pre></td></tr></table></figure>
+
+<h2 id="实验"><a href="#实验" class="headerlink" title="实验"></a>实验</h2><p>Github链接：<a target="_blank" rel="noopener" href="https://github.com/bugducky/SRImplements/tree/master/rcan">https://github.com/bugducky/SRImplements/tree/master/rcan</a></p>
+<p>数据集还是用的上篇SRCNN里使用的BSDS200，我也想跑DIV2K，但我没钱。</p>
+<p>跑了5000 iterations，loss下降的很平缓，到后面一直振荡。也可能数据太简单、模型的性能就是如此。服务器挂了，没有用 wandb 记录loss的情况，放一张效果对比图图一乐吧。</p>
+<p><img src="/2022/05/15/RCAN/5600.png" alt="RCAN/5600"></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/deeplearning/" rel="tag"># deeplearning</a>
+              <a href="/tags/super-resolutio/" rel="tag"># super-resolutio</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2022/05/14/SRCNN/" rel="prev" title="浅读SRCNN">
+                  <i class="fa fa-chevron-left"></i> 浅读SRCNN
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2022/05/15/SwinIR/" rel="next" title="浅读SwinIR">
+                  浅读SwinIR <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Bugducky</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://cdn.jsdelivr.net/npm/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+
+
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><script class="next-config" data-name="mathjax" type="application/json">{"enable":true,"tags":"all","js":{"url":"https://cdn.jsdelivr.net/npm/mathjax@3.2.0/es5/tex-mml-chtml.js","integrity":"sha256-r+3itOMtGGjap0x+10hu6jW/gZCzxHsoKrOd7gyRSGY="}}</script>
+<script src="/js/third-party/math/mathjax.js"></script>
+
+
+
+</body>
+</html>
